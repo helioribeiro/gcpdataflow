@@ -12,7 +12,7 @@
 
 ---
 
-## ✨ Table of Contents
+## 📖 Table of Contents
 
 1. [Architecture](#-architecture)
 2. [Quick Start](#-quick-start)
@@ -22,7 +22,6 @@
 6. [Cloud Run (Dataflow)](#-cloud-run-dataflow)
 7. [Cost & Cleanup](#-cost--cleanup)
 8. [Project Structure](#-project-structure)
-9. [FAQ](#-faq)
 
 ---
 
@@ -40,18 +39,21 @@ Dataflow (Python), BigQuery, GCS, TerraForm, Docker.
 
 ```bash
 # 0) clone & cd
-git clone https://github.com/your/repo.git
-cd repo
+git clone https://github.com/helioribeiro/gcpdataflow
+cd gcpdataflow
+gcloud services enable dataflow.googleapis.com bigquery.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com
 
-# 1) provision infra in devhelio-460409
-cd terraform
-terraform init
-terraform apply -auto-approve -var="project_id=devhelio-460409"
+# 1) provision infra
+PROJECT_ID=$(gcloud config get-value project 2>/dev/null) && \
+echo "🔧  Using project: $PROJECT_ID" && \
+cd terraform && \
+terraform init && \
+terraform apply -auto-approve -var="project_id=${PROJECT_ID}"
 # grab the bucket_name and service_account_email outputs
 cd ..
 
 # 2) local smoke‑test (DirectRunner)
-docker compose build         # one‑off
+docker compose build         
 docker compose run pipeline   --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare
 
 # 3) launch in the cloud (DataflowRunner)

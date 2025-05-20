@@ -17,6 +17,27 @@ provider "google" {
   region  = "us-central1"
 }
 
+data "google_iam_service_accounts" "existing_sa" {
+  project = var.project_id
+
+  # exact match on the e‑mail we plan to use
+  filter = "email = \"dataflow-pipeline-sa@${var.project_id}.iam.gserviceaccount.com\""
+}
+
+resource "google_service_account" "dataflow_sa" {
+  count        = length(data.google_iam_service_accounts.existing_sa.accounts) == 0 ? 1 : 0
+  account_id   = "dataflow-pipeline-sa"
+  display_name = "Dataflow Pipeline Service Account"
+}
+
+locals {
+  dataflow_sa_email = (
+    length(data.google_iam_service_accounts.existing_sa.accounts) > 0
+      ? data.google_iam_service_accounts.existing_sa.accounts[0].email
+      : google_service_account.dataflow_sa[0].email
+  )
+}
+
 variable "project_id" {
   description = "Your GCP Project ID"
   type        = string
