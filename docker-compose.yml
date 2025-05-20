@@ -1,0 +1,13 @@
+version: '3'
+services:
+  pipeline:
+    build: .
+    # Mount Google Cloud credentials for authentication
+    volumes:
+      # Mount Application Default Credentials (if you've run 'gcloud auth application-default login')
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    # Optionally, if using a service account key file for auth:
+    # volumes:
+    #   - ./gcp-sa-key.json:/tmp/sa-key.json:ro
+    #   environment:
+    #     - GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
