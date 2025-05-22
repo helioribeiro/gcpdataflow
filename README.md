@@ -44,9 +44,7 @@ gcloud auth application-default login
 git clone https://github.com/helioribeiro/gcpdataflow
 cd gcpdataflow
 gcloud services enable dataflow.googleapis.com bigquery.googleapis.com bigquerystorage.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com
-echo "Waiting 50 seconds for API grants to propagate..."
-sleep 50 
-pip install requirements.txt
+pip install -r requirements.txt
 chmod +x scripts/create-sa-key.sh
 
 # infra
