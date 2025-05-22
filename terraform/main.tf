@@ -7,7 +7,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = ">= 5.0.0"
+      version = ">= 5.25.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -52,6 +52,8 @@ resource "google_service_account" "dataflow_sa" {
   account_id   = var.dataflow_sa_account_id
   display_name = "Dataflow Service Account"
 
+  create_ignore_already_exists = true
+
   lifecycle {
     prevent_destroy = true       # guard against accidental deletion
   }
@@ -94,6 +96,18 @@ resource "google_storage_bucket_iam_member" "bucket_permissions" {
   member = "serviceAccount:${google_service_account.dataflow_sa.email}"
 }
 
+resource "google_project_iam_member" "dataflow_bq_storage" {
+  project = var.project_id
+  role    = "roles/bigquery.readSessionUser"
+  member  = "serviceAccount:${google_service_account.dataflow_sa.email}"
+}
+
+resource "google_project_iam_member" "dataflow_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.admin"
+  member  = "serviceAccount:${google_service_account.dataflow_sa.email}"
+}
+
 # Example (commented) – grant the SA access to a private BigQuery dataset
 # resource "google_bigquery_dataset_iam_member" "bq_access" {
 #   dataset_id = "your_dataset"
@@ -112,4 +126,8 @@ output "dataflow_service_account_email" {
 output "bucket_name" {
   description = "GCS bucket for staging / temp files"
   value       = google_storage_bucket.dataflow_bucket.name
+}
+
+output "region" {
+  value = var.region
 }
