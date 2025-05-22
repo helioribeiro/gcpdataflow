@@ -89,6 +89,18 @@ resource "google_project_iam_member" "dataflow_developer" {
   member  = "serviceAccount:${google_service_account.dataflow_sa.email}"
 }
 
+resource "google_project_iam_member" "dataflow_serviceusage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.dataflow_sa.email}"
+}
+
+resource "google_project_iam_member" "dataflow_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${google_service_account.dataflow_sa.email}"
+}
+
 # Bucket permissions – read/write objects
 resource "google_storage_bucket_iam_member" "bucket_permissions" {
   bucket = google_storage_bucket.dataflow_bucket.name

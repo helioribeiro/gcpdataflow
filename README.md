@@ -2,9 +2,9 @@
 
 <p align="center">
   <img alt="GCP" src="https://img.shields.io/badge/GCP-Dataflow-blue?logo=googlecloud" />
-  <img alt="Apache Beam" src="https://img.shields.io/badge/Apache%20Beam-2.56-orange?logo=apache" />
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10-yellow?logo=python" />
-  <img alt="Terraform" src="https://img.shields.io/badge/Terraform-1.x-purple?logo=terraform" />
+  <img alt="Apache Beam" src="https://img.shields.io/badge/Apache%20Beam-2.65-orange?logo=apache" />
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.12-yellow?logo=python" />
+  <img alt="Terraform" src="https://img.shields.io/badge/Terraform-1.3-purple?logo=terraform" />
 </p>
 
 > **Demo**: query a BigQuery public dataset, filter it with Apache Beam,  
@@ -31,22 +31,28 @@ Dataflow (Python), BigQuery, GCS, TerraForm, Docker.
 
 * **Dataset**: `bigquery-public-data.samples.shakespeare` (~6 MB, free tier).  
 * **Transform**: keep words with `word_count > 100`.  
-* **Sink**: Parquet file(s) in a Terraform‑generated bucket `gs://devhelio-460409-dataflow-temp-XXXX/`.
+* **Sink**: Parquet file(s) in a Terraform‑generated bucket `gs://project-dataflow-temp-XXXX/`.
 
 ---
 
 ## ⚡ Quick Start
 
+### 1) Run the following commands
 ```bash
-# 0) clone & cd
-gloud init
+gcloud init
 gcloud auth application-default login
 git clone https://github.com/helioribeiro/gcpdataflow
 cd gcpdataflow
+chmod +x setup_environment.sh
+./setup_environment.sh
+```
+
+### This Script runs the following commands:
+```bash
 gcloud services enable dataflow.googleapis.com bigquery.googleapis.com bigquerystorage.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com 
 chmod +x scripts/create-sa-key.sh
 
-# 1) provision infra
+# infra
 unset GOOGLE_APPLICATION_CREDENTIALS
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null) && \
 echo "Using project: $PROJECT_ID" && \
@@ -59,14 +65,19 @@ export DATAFLOW_SA_EMAIL="$SA_EMAIL" && \
 ./scripts/create-sa-key.sh && \
 export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/sa-key.json" && \
 echo "Using bucket: $BUCKET_NAME"
+unset GOOGLE_APPLICATION_CREDENTIALS
+```
 
-# 2) local smoke‑test (DirectRunner)
+### 2) Local Test (DirectRunner)
+```bash
 docker compose build         
 docker compose run pipeline \
   --project "$PROJECT_ID" \
   --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare
+```
 
-# 3) launch in the cloud (DataflowRunner)
+### 3) Dataflow (DataflowRunner)
+```bash
 python pipeline.py \
   --runner               DataflowRunner \
   --project              "$PROJECT_ID" \
@@ -89,12 +100,13 @@ python pipeline.py \
 | **gcloud** | ≥ 467 | Auth & API enablement |
 | **Terraform** | ≥ 1.3 | IaC provisioning |
 | **Docker & Compose** | ≥ 24 | Local DirectRunner (optional) |
-| **Python** | ≥ 3.10 | Direct CLI submission (if not using Docker) |
+| **Python** | ≥ 3.12 | Direct CLI submission |
+| **Apache Beam (GCP)** | ≥ 2.65 | Transformation Engine |
 
-Make sure the following APIs are **enabled** in *devhelio‑460409*:
+Make sure the following APIs are **enabled**:
 
 ```bash
-gcloud services enable dataflow.googleapis.com                        bigquery.googleapis.com                        compute.googleapis.com
+gcloud services enable dataflow.googleapis.com bigquery.googleapis.com bigquerystorage.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com 
 ```
 
 ---
@@ -102,13 +114,9 @@ gcloud services enable dataflow.googleapis.com                        bigquery.g
 ## ☁️ Infrastructure as Code – Terraform
 
 * **Randomized bucket**: `${project}-dataflow-temp-<suffix>` (multi‑region **US**).  
-* **Service Account**: `dataflow-pipeline-sa@devhelio-460409.iam.gserviceaccount.com`  
+* **Service Account**: `dataflow-pipeline-sa@account.iam.gserviceaccount.com`  
   * `roles/dataflow.worker` • `roles/dataflow.developer` • `roles/storage.objectAdmin` (bucket‑scoped)  
 * **force_destroy** = true → easy teardown.
-
-```bash
-terraform destroy -auto-approve -var="project_id=devhelio-460409"
-```
 
 ---
 
@@ -117,9 +125,12 @@ terraform destroy -auto-approve -var="project_id=devhelio-460409"
 1. **Build**: `docker compose build`
 2. **Run**:  
    ```bash
-   docker compose run pipeline      --output gs://<BUCKET>/output/shakespeare      --temp_location gs://<BUCKET>/temp
+   docker compose build         
+   docker compose run pipeline \
+   --project "$PROJECT_ID" \
+   --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare
    ```
-3. **Validate**: `gsutil ls gs://<BUCKET>/output/`
+3. **Validate**: `gsutil ls gs://${BUCKET_NAME}/output/`
 
 No Dataflow charges; only a tiny BigQuery read (under free tier).
 
@@ -131,10 +142,15 @@ Submit with either **Python** (native) or **Docker**:
 
 ```bash
 # native
-python pipeline.py --runner DataflowRunner ...
-
-# containerised
-docker run --rm -v ~/.config/gcloud:/root/.config/gcloud:ro   your-image:latest --runner DataflowRunner ...
+python pipeline.py \
+  --runner               DataflowRunner \
+  --project              "$PROJECT_ID" \
+  --region               "$REGION" \
+  --temp_location        "gs://$BUCKET_NAME/temp/" \
+  --staging_location     "gs://$BUCKET_NAME/staging/" \
+  --service_account_email "$DATAFLOW_SA_EMAIL" \
+  --output               "gs://$BUCKET_NAME/output/shakespeare" \
+  --max_num_workers      1
 ```
 
 ### Cost Guardrails 💸
@@ -166,21 +182,16 @@ Always destroy the bucket if you no longer need the output files.
 
 ```
 .
-├── Dockerfile              # Beam + PyArrow image
-├── docker-compose.yml      # local DirectRunner harness
-├── pipeline.py             # Apache Beam pipeline
+├── create-sa-key.sh        # Script to generate GCP service account key
+├── Dockerfile              # Beam + PyArrow container image
+├── docker-compose.yml      # Local DirectRunner harness
+├── pipeline.py             # Apache Beam pipeline definition
+├── auto_gcs_locations.py   # Auto-inject GCS temp/staging options
+├── requirements.txt        # Python dependencies
 ├── terraform/
-│   └── main.tf             # bucket, service account, IAM
-└── README.md               # you’re here
+│   └── main.tf             # Terraform config: GCP resources
+├── setup_environment.sh    # Script for quick setup with Terraform
+└── README.md               # You're here
 ```
 
 ---
-
-
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null) && \
-echo "🔧  Enabling APIs for project: $PROJECT_ID" && \
-gcloud services enable iam.googleapis.com serviceusage.googleapis.com \
-  --project="$PROJECT_ID" && \
-echo "⏳  Waiting ~30 s for API propagation…" && sleep 30 && \
-terraform init && \
-terraform apply -auto-approve -var="project_id=$PROJECT_ID"

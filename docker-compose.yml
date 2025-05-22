@@ -1,7 +1,6 @@
 services:
   pipeline:
     build: .
-    # Mount Google Cloud credentials for authentication
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
     volumes:
