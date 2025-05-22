@@ -42,19 +42,23 @@ Dataflow (Python), BigQuery, GCS, TerraForm, Docker.
 git clone https://github.com/helioribeiro/gcpdataflow
 cd gcpdataflow
 gcloud services enable dataflow.googleapis.com bigquery.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com
+chmod +x scripts/create-sa-key.sh
 
 # 1) provision infra
 PROJECT_ID=$(gcloud config get-value project 2>/dev/null) && \
-echo "🔧  Using project: $PROJECT_ID" && \
-cd terraform && \
-terraform init && \
-terraform apply -auto-approve -var="project_id=${PROJECT_ID}"
-# grab the bucket_name and service_account_email outputs
-cd ..
+echo "Using project: $PROJECT_ID" && \
+cd terraform && terraform init && terraform apply -auto-approve -var="project_id=$PROJECT_ID" && \
+BUCKET_NAME=$(terraform output -raw bucket_name) && \
+SA_EMAIL=$(terraform output -raw dataflow_service_account_email) && \
+cd .. && \
+export DATAFLOW_SA_EMAIL="$SA_EMAIL" && \
+./scripts/create-sa-key.sh && \
+export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/sa-key.json" && \
+echo "Using bucket: $BUCKET_NAME"
 
 # 2) local smoke‑test (DirectRunner)
 docker compose build         
-docker compose run pipeline   --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare
+docker compose run pipeline  --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare
 
 # 3) launch in the cloud (DataflowRunner)
 python pipeline.py   --runner DataflowRunner   --project devhelio-460409   --region us-central1   --temp_location gs://$(terraform -chdir=terraform output -raw bucket_name)/temp/   --staging_location gs://$(terraform -chdir=terraform output -raw bucket_name)/staging/   --service_account_email $(terraform -chdir=terraform output -raw service_account_email)   --output gs://$(terraform -chdir=terraform output -raw bucket_name)/output/shakespeare   --max_num_workers 1
