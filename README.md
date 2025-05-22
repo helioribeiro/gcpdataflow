@@ -43,13 +43,10 @@ gcloud init
 gcloud auth application-default login
 git clone https://github.com/helioribeiro/gcpdataflow
 cd gcpdataflow
-chmod +x setup_environment.sh
-./setup_environment.sh
-```
-
-### This Script runs the following commands:
-```bash
-gcloud services enable dataflow.googleapis.com bigquery.googleapis.com bigquerystorage.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com 
+gcloud services enable dataflow.googleapis.com bigquery.googleapis.com bigquerystorage.googleapis.com compute.googleapis.com iam.googleapis.com serviceusage.googleapis.com storage.googleapis.com
+echo "Waiting 50 seconds for API grants to propagate..."
+sleep 50 
+pip install requirements.txt
 chmod +x scripts/create-sa-key.sh
 
 # infra
